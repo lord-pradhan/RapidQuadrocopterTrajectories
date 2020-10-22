@@ -163,4 +163,9 @@ axThrust.set_title('Inputs')
 axThrust.set_ylim([min(fmin-1,min(thrust)), max(fmax+1,max(thrust))])
 axOmega.set_ylim([0, max(wmax+1,max(ratesMagn))])
 
+#visualize multiple trajectories
+plt.figure(0)
+
+
+
 plt.show()
