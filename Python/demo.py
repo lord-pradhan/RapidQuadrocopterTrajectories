@@ -38,19 +38,42 @@ VERSION
 
 from __future__ import print_function, division
 import quadrocoptertrajectory as quadtraj
+import matplotlib.pyplot as plt
+import matplotlib.gridspec as gridspec
+import numpy as np
+from mpl_toolkits.mplot3d import Axes3D
 
 # Define the trajectory starting state:
-pos0 = [0, 0, 2] #position
-vel0 = [0, 0, 0] #velocity
+pos0 = [2, 1, 2] #position
+vel0 = [0, -0.2, 0.1] #velocity
 acc0 = [0, 0, 0] #acceleration
 
 # Define the goal state:
 posf = [1, 0, 1]  # position
 velf = [0, 0, 1]  # velocity
-accf = [0, 9.81, 0]  # acceleration
+accf = [0, 0, 0]  # acceleration
+
+# Define circle around goal
+r_c = 0.3
+N_points = 10; N_times = 2
+vel_mag = 1
+# theta = []; phi=[]
+theta = np.linspace(0, 3.14, N_points)
+phi = np.linspace(0, 3.14, N_points)
+
+posArr = np.zeros((N_points**2, 3))
+velArr = np.zeros((N_points**2, 3))
+accArr = np.zeros((N_points**2, 3))
+
+for i in range(N_points):
+    for j in range(N_points):
+        posArr[N_points*i + j][:] = posf + np.array([ r_c*np.sin(phi[j])*np.cos(theta[i]), r_c*np.sin(phi[j])*np.sin(theta[i]), r_c*np.cos(phi[j]) ])
+        velArr[N_points*i + j][:] = vel_mag * (posf -  posArr[N_points*i + j][:]) /  ((posf -  posArr[N_points*i + j][:])**2).sum()**0.5
 
 # Define the duration:
 Tf = 1
+
+timeArr = np.linspace(3,5,N_times)
 
 # Define the input limits:
 fmin = 5  #[m/s**2]
@@ -87,85 +110,126 @@ inputsFeasible = traj.check_input_feasibility(fmin, fmax, wmax, minTimeSec)
 floorPoint  = [0,0,0]  # a point on the floor
 floorNormal = [0,0,1]  # we want to be in this direction of the point (upwards)
 positionFeasible = traj.check_position_feasibility(floorPoint, floorNormal)
- 
-for i in range(3):
-    print("Axis #" , i)
-    print("\talpha = " ,traj.get_param_alpha(i), "\tbeta = "  ,traj.get_param_beta(i), "\tgamma = " ,traj.get_param_gamma(i))
-print("Total cost = " , traj.get_cost())
-print("Input feasibility result: ",    quadtraj.InputFeasibilityResult.to_string(inputsFeasible),   "(", inputsFeasible, ")")
-print("Position feasibility result: ", quadtraj.StateFeasibilityResult.to_string(positionFeasible), "(", positionFeasible, ")")
-
-###########################################
-# Plot the trajectories, and their inputs #
-###########################################
-
-import matplotlib.pyplot as plt
-import matplotlib.gridspec as gridspec
-import numpy as np
-
-numPlotPoints = 100
-time = np.linspace(0, Tf, numPlotPoints)
-position = np.zeros([numPlotPoints, 3])
-velocity = np.zeros([numPlotPoints, 3])
-acceleration = np.zeros([numPlotPoints, 3])
-thrust = np.zeros([numPlotPoints, 1])
-ratesMagn = np.zeros([numPlotPoints,1])
-
-for i in range(numPlotPoints):
-    t = time[i]
-    position[i, :] = traj.get_position(t)
-    velocity[i, :] = traj.get_velocity(t)
-    acceleration[i, :] = traj.get_acceleration(t)
-    thrust[i] = traj.get_thrust(t)
-    ratesMagn[i] = np.linalg.norm(traj.get_body_rates(t))
-
-figStates, axes = plt.subplots(3,1,sharex=True)
-gs = gridspec.GridSpec(6, 2)
-axPos = plt.subplot(gs[0:2, 0])
-axVel = plt.subplot(gs[2:4, 0])
-axAcc = plt.subplot(gs[4:6, 0])
-
-for ax,yvals in zip([axPos, axVel, axAcc], [position,velocity,acceleration]):
-    cols = ['r','g','b']
-    labs = ['x','y','z']
-    for i in range(3):
-        ax.plot(time,yvals[:,i],cols[i],label=labs[i])
-
-axPos.set_ylabel('Pos [m]')
-axVel.set_ylabel('Vel [m/s]')
-axAcc.set_ylabel('Acc [m/s^2]')
-axAcc.set_xlabel('Time [s]')
-axPos.legend()
-axPos.set_title('States')
-
-infeasibleAreaColour = [1,0.5,0.5]
-axThrust = plt.subplot(gs[0:3, 1])
-axOmega  = plt.subplot(gs[3:6, 1])
-axThrust.plot(time,thrust,'k', label='command')
-axThrust.plot([0,Tf],[fmin,fmin],'r--', label='fmin')
-axThrust.fill_between([0,Tf],[fmin,fmin],-1000,facecolor=infeasibleAreaColour, color=infeasibleAreaColour)
-axThrust.fill_between([0,Tf],[fmax,fmax], 1000,facecolor=infeasibleAreaColour, color=infeasibleAreaColour)
-axThrust.plot([0,Tf],[fmax,fmax],'r-.', label='fmax')
-
-axThrust.set_ylabel('Thrust [m/s^2]')
-axThrust.legend()
-
-axOmega.plot(time, ratesMagn,'k',label='command magnitude')
-axOmega.plot([0,Tf],[wmax,wmax],'r--', label='wmax')
-axOmega.fill_between([0,Tf],[wmax,wmax], 1000,facecolor=infeasibleAreaColour, color=infeasibleAreaColour)
-axOmega.set_xlabel('Time [s]')
-axOmega.set_ylabel('Body rates [rad/s]')
-axOmega.legend()
-
-axThrust.set_title('Inputs')
-
-#make the limits pretty:
-axThrust.set_ylim([min(fmin-1,min(thrust)), max(fmax+1,max(thrust))])
-axOmega.set_ylim([0, max(wmax+1,max(ratesMagn))])
-
-#visualize multiple trajectories
-plt.figure(0)
 
 
+##### Custom code to test multiple trajs #####
+# posLib = []
+# velLib = []
+# accLib = []
+# inputCheck = []
+# posCheck = []
+numPlotPoints = 200
+fig = plt.figure()
+ax = fig.add_subplot(111, projection='3d')
 
+trajLib = []
+
+for i in range(N_points):
+    for j in range(N_points):
+        for k in range(N_times):
+
+            trajTemp = quadtraj.RapidTrajectory(pos0, vel0, acc0, gravity)
+            trajTemp.set_goal_position(posArr[N_points*i + j][:])
+            trajTemp.set_goal_velocity(velArr[N_points*i + j][:])
+            # trajTemp.set_goal_acceleration(accArr[i][:])
+            trajTemp.generate(timeArr[k])
+
+            inputsFeasible = trajTemp.check_input_feasibility(fmin, fmax, wmax, minTimeSec)
+            # Test whether we fly into the floor
+            floorPoint  = [0,0,0]  # a point on the floor
+            floorNormal = [0,0,1]  # we want to be in this direction of the point (upwards)
+            positionFeasible = trajTemp.check_position_feasibility(floorPoint, floorNormal)
+            print('positionFeasible is ', positionFeasible, 'inputsFeasible is ',inputsFeasible)
+
+            trajLib.append(trajTemp)
+
+            # plotting
+            time = np.linspace(0, timeArr[k], numPlotPoints)
+            position = np.zeros([numPlotPoints, 3])
+
+            for l in range(numPlotPoints):
+                t = time[l]
+                position[l, :] = trajTemp.get_position(t)
+
+            ax.plot3D(position[:, 0], position[:, 1], position[:, 2])
+        
 plt.show()
+
+ 
+# for i in range(3):
+#     print("Axis #" , i)
+#     print("\talpha = " ,traj.get_param_alpha(i), "\tbeta = "  ,traj.get_param_beta(i), "\tgamma = " ,traj.get_param_gamma(i))
+# print("Total cost = " , traj.get_cost())
+# print("Input feasibility result: ",    quadtraj.InputFeasibilityResult.to_string(inputsFeasible),   "(", inputsFeasible, ")")
+# print("Position feasibility result: ", quadtraj.StateFeasibilityResult.to_string(positionFeasible), "(", positionFeasible, ")")
+
+# ###########################################
+# # Plot the trajectories, and their inputs #
+# ###########################################
+
+# numPlotPoints = 100
+# time = np.linspace(0, Tf, numPlotPoints)
+# position = np.zeros([numPlotPoints, 3])
+# velocity = np.zeros([numPlotPoints, 3])
+# acceleration = np.zeros([numPlotPoints, 3])
+# thrust = np.zeros([numPlotPoints, 1])
+# ratesMagn = np.zeros([numPlotPoints,1])
+
+# for i in range(numPlotPoints):
+#     t = time[i]
+#     position[i, :] = traj.get_position(t)
+#     velocity[i, :] = traj.get_velocity(t)
+#     acceleration[i, :] = traj.get_acceleration(t)
+#     thrust[i] = traj.get_thrust(t)
+#     ratesMagn[i] = np.linalg.norm(traj.get_body_rates(t))
+
+# figStates, axes = plt.subplots(3,1,sharex=True)
+# gs = gridspec.GridSpec(6, 2)
+# axPos = plt.subplot(gs[0:2, 0])
+# axVel = plt.subplot(gs[2:4, 0])
+# axAcc = plt.subplot(gs[4:6, 0])
+
+# for ax,yvals in zip([axPos, axVel, axAcc], [position,velocity,acceleration]):
+#     cols = ['r','g','b']
+#     labs = ['x','y','z']
+#     for i in range(3):
+#         ax.plot(time,yvals[:,i],cols[i],label=labs[i])
+
+# axPos.set_ylabel('Pos [m]')
+# axVel.set_ylabel('Vel [m/s]')
+# axAcc.set_ylabel('Acc [m/s^2]')
+# axAcc.set_xlabel('Time [s]')
+# axPos.legend()
+# axPos.set_title('States')
+
+# infeasibleAreaColour = [1,0.5,0.5]
+# axThrust = plt.subplot(gs[0:3, 1])
+# axOmega  = plt.subplot(gs[3:6, 1])
+# axThrust.plot(time,thrust,'k', label='command')
+# axThrust.plot([0,Tf],[fmin,fmin],'r--', label='fmin')
+# axThrust.fill_between([0,Tf],[fmin,fmin],-1000,facecolor=infeasibleAreaColour, color=infeasibleAreaColour)
+# axThrust.fill_between([0,Tf],[fmax,fmax], 1000,facecolor=infeasibleAreaColour, color=infeasibleAreaColour)
+# axThrust.plot([0,Tf],[fmax,fmax],'r-.', label='fmax')
+
+# axThrust.set_ylabel('Thrust [m/s^2]')
+# axThrust.legend()
+
+# axOmega.plot(time, ratesMagn,'k',label='command magnitude')
+# axOmega.plot([0,Tf],[wmax,wmax],'r--', label='wmax')
+# axOmega.fill_between([0,Tf],[wmax,wmax], 1000,facecolor=infeasibleAreaColour, color=infeasibleAreaColour)
+# axOmega.set_xlabel('Time [s]')
+# axOmega.set_ylabel('Body rates [rad/s]')
+# axOmega.legend()
+
+# axThrust.set_title('Inputs')
+
+# #make the limits pretty:
+# axThrust.set_ylim([min(fmin-1,min(thrust)), max(fmax+1,max(thrust))])
+# axOmega.set_ylim([0, max(wmax+1,max(ratesMagn))])
+
+# #visualize multiple trajectories
+# plt.figure(0)
+
+
+
+# plt.show()
